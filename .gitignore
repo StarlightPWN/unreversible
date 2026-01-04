@@ -1,0 +1,7 @@
+.DS_Store
+__pycache__
+unreversible/yarn/yarn_spinner_pb2.py
+decompiled/
+index.generated.py
+.venv/
+yarn_spinner.proto
