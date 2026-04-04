@@ -848,7 +848,7 @@ class Decompiler:
             case HigherLevelInstructionAddOptionAdvanced(_, line, destination, _, condition):
                 # return (f"-> {self.localize(line)}{' <<' + condition + '>>' if condition else ''}\n" + self.repr_block(node, destination, 1)).rstrip()
                 # TODO: DEBUGGING PURPOSES ONLY (use of `disassemble_block`)
-                return (f"-> {self.localize(line)}{' <<' + condition + '>>' if condition else ''}\n" + self.disassemble_block(node, destination, 1)).rstrip()
+                return (f"-> {self.localize(line)}{' <<if ' + condition + '>>' if condition else ''}\n" + self.disassemble_block(node, destination, 1)).rstrip()
             case HigherLevelInstructionIf(_, clauses):
                 clauses_repr = []
                 for i, clause in enumerate(clauses):
