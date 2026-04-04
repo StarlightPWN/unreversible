@@ -671,12 +671,14 @@ class Decompiler:
                                                 match final_inst := body[-1]:
                                                     case HigherLevelInstructionLowerLevelOpcode(_, Instruction(Opcode.JUMP_TO, [end])):
                                                         lifted_node.fold(i - 1, i, HigherLevelInstructionIfClause(HigherLevelOpcode.IF_CLAUSE, self.higherlevel_repr(lifted_node, condition), destination, end, else_))
+                                                        break
                                                     case HigherLevelInstructionIfClause(_, _, _, nested_dest):
                                                         if not lifted_node.need_lifting(lifted_node.block(nested_dest)[:-1]):
                                                             nested_body = lifted_node.block(nested_dest)
                                                             match nested_body[-1]:
                                                                 case HigherLevelInstructionLowerLevelOpcode(_, Instruction(Opcode.JUMP_TO, [end])):
                                                                     lifted_node.fold(i - 1, i, HigherLevelInstructionIfClause(HigherLevelOpcode.IF_CLAUSE, self.higherlevel_repr(lifted_node, condition), destination, end, else_))
+                                                                    break
                                                                 case _:
                                                                     errors.append(CannotLiftInstructionError(f"Expected JUMP_TO instruction at end of nested if body '{destination}' -> '{nested_dest}', found {final_inst}", lifted_node, i))
                                                     case _:
@@ -685,10 +687,12 @@ class Decompiler:
                                     arity = int(operands[0]) if operands else 0
                                     if (substitution_nodes := peek_incomplete_representable(i, arity)) is not None:
                                         lifted_node.fold(i - arity, i, HigherLevelInstructionRunLineAdvanced(HigherLevelOpcode.RUN_LINE_ADV, line, [self.higherlevel_repr(lifted_node, substitution_node) for substitution_node in substitution_nodes]))
+                                        break
                                 case Instruction(Opcode.RUN_COMMAND, [command, *operands]):
                                     arity = int(operands[0]) if operands else 0
                                     if (substitution_nodes := peek_incomplete_representable(i, arity)) is not None:
                                         lifted_node.fold(i - arity, i, HigherLevelInstructionRunCommandAdvanced(HigherLevelOpcode.RUN_COMMAND_ADV, command, [self.higherlevel_repr(lifted_node, substitution_node) for substitution_node in substitution_nodes]))
+                                        break
                     case HigherLevelInstructionJumpOptions(_):
                         if options := consume_options(i):
                             give_up = False
