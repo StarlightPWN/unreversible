@@ -1,7 +1,6 @@
 import os
 import os.path
-from unreversible.yarn import YarnProject
-from unreversible.decompiler import Decompiler
+from unreversible.yarn import YarnProject, Decompiler
 from unreversible.unity import init_assetstore
 from unreversible.unity.loader import load_path, load_guid, ShallowLoader
 
