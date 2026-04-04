@@ -25,6 +25,6 @@ for project_guid in yarn_project_guids_hashset.keys():
     project = YarnProject(project_behaviour.data)
     decompiler = Decompiler(project)
 
-    with open(os.path.join('./decompiled/yarn/', (project.name or project_behaviour.name) + '.hldisasm.txt'), "w") as f:
+    with open(os.path.join('./decompiled/yarn/', (project.name or project_behaviour.name) + '.yarn'), "w") as f:
         f.write(decompiler.disassemble_all())
         print('Disassembled', project_behaviour.name)
