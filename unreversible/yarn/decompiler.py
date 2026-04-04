@@ -6,7 +6,6 @@ import functools
 from enum import Enum
 from typing import Literal
 from dataclasses import dataclass
-from collections import defaultdict
 
 OPERATOR_FORMAT = {
     "String.EqualTo": "{} == {}",
@@ -33,7 +32,7 @@ OPERATOR_FORMAT = {
 }
 
 HIGHERLEVEL_INCOMPLETE = 1 << 8
-LOWERLEVEL_COMPLETE = {Opcode.RUN_COMMAND, Opcode.RUN_LINE, Opcode.STOP}
+LOWERLEVEL_COMPLETE = {Opcode.STOP}
 # lower-level opcodes that conditionally or unconditionally jump to another location in the same node
 LOWERLEVEL_EXITABLE = {
     Opcode.JUMP_TO,
@@ -53,6 +52,8 @@ class HigherLevelOpcode(Enum):
     # placeholder for spacing (so two choice blocks don't get merged by accident)
     SPACER = 6
     IF = 7
+    RUN_LINE_ADV = 8
+    RUN_COMMAND_ADV = 9
 
     # "incomplete"/expression opcodes, can't stand alone
     # each one pushes one value without popping
@@ -85,6 +86,19 @@ class HigherLevelInstructionRunNodeAdvanced(HigherLevelInstruction):
     opcode: Literal[HigherLevelOpcode.RUN_NODE_ADV]
     node: str
 
+
+@dataclass
+class HigherLevelInstructionRunLineAdvanced(HigherLevelInstruction):
+    opcode: Literal[HigherLevelOpcode.RUN_LINE_ADV]
+    line: str
+    expressions: list[str]
+
+
+@dataclass
+class HigherLevelInstructionRunCommandAdvanced(HigherLevelInstruction):
+    opcode: Literal[HigherLevelOpcode.RUN_COMMAND_ADV]
+    command: str
+    expressions: list[str]
 
 @dataclass
 class HigherLevelInstructionStoreVariableAdvanced(HigherLevelInstruction):
@@ -242,6 +256,10 @@ class LiftedNode:
                 case HigherLevelInstructionAddOptionAdvanced(_, _, destination):
                     if self.block_needs_lifting(destination):
                         return True
+                case HigherLevelInstructionIf(_, clauses):
+                    for clause in clauses:
+                        if self.need_lifting(self.block(clause.destination)):
+                            return True
 
             if instruction.opcode.value & HIGHERLEVEL_INCOMPLETE:
                 return True
@@ -293,6 +311,8 @@ class Decompiler:
             errors = e.errors
 
         node_disasm = self.disassemble_lifted_node(lifted_node) if full_node else self.disassemble_block(lifted_node, "start")
+        if not lifted_node.block_needs_lifting("start"):
+            node_disasm = self.repr_block(lifted_node, "start")
         if node_disasm.endswith("\n<<stop>>"):
             node_disasm = node_disasm[:-9]
         node_disasm = node_disasm.strip()
@@ -348,7 +368,7 @@ class Decompiler:
     def repr_block(self, node, block_name: str, indent_level=0):
         # basic blocks can reference each other so this should be fine
         # why would you need to call this early anyways
-        if node.needs_lifting(block_name):
+        if node.block_needs_lifting(block_name):
             raise NotYetLiftedError(
                 "Refusing to represent basic block containing orphaned expressions!",
                 node,
@@ -651,8 +671,24 @@ class Decompiler:
                                                 match final_inst := body[-1]:
                                                     case HigherLevelInstructionLowerLevelOpcode(_, Instruction(Opcode.JUMP_TO, [end])):
                                                         lifted_node.fold(i - 1, i, HigherLevelInstructionIfClause(HigherLevelOpcode.IF_CLAUSE, self.higherlevel_repr(lifted_node, condition), destination, end, else_))
+                                                    case HigherLevelInstructionIfClause(_, _, _, nested_dest):
+                                                        if not lifted_node.need_lifting(lifted_node.block(nested_dest)[:-1]):
+                                                            nested_body = lifted_node.block(nested_dest)
+                                                            match nested_body[-1]:
+                                                                case HigherLevelInstructionLowerLevelOpcode(_, Instruction(Opcode.JUMP_TO, [end])):
+                                                                    lifted_node.fold(i - 1, i, HigherLevelInstructionIfClause(HigherLevelOpcode.IF_CLAUSE, self.higherlevel_repr(lifted_node, condition), destination, end, else_))
+                                                                case _:
+                                                                    errors.append(CannotLiftInstructionError(f"Expected JUMP_TO instruction at end of nested if body '{destination}' -> '{nested_dest}', found {final_inst}", lifted_node, i))
                                                     case _:
                                                         errors.append(CannotLiftInstructionError(f"Expected JUMP_TO instruction at end of if body '{destination}', found {final_inst}", lifted_node, i))
+                                case Instruction(Opcode.RUN_LINE, [line, *operands]):
+                                    arity = int(operands[0]) if operands else 0
+                                    if (substitution_nodes := peek_incomplete_representable(i, arity)) is not None:
+                                        lifted_node.fold(i - arity, i, HigherLevelInstructionRunLineAdvanced(HigherLevelOpcode.RUN_LINE_ADV, line, [self.higherlevel_repr(lifted_node, substitution_node) for substitution_node in substitution_nodes]))
+                                case Instruction(Opcode.RUN_COMMAND, [command, *operands]):
+                                    arity = int(operands[0]) if operands else 0
+                                    if (substitution_nodes := peek_incomplete_representable(i, arity)) is not None:
+                                        lifted_node.fold(i - arity, i, HigherLevelInstructionRunCommandAdvanced(HigherLevelOpcode.RUN_COMMAND_ADV, command, [self.higherlevel_repr(lifted_node, substitution_node) for substitution_node in substitution_nodes]))
                     case HigherLevelInstructionJumpOptions(_):
                         if options := consume_options(i):
                             give_up = False
@@ -667,8 +703,11 @@ class Decompiler:
                                 match choice_final_inst:
                                     case HigherLevelInstructionLowerLevelOpcode(_, Instruction(Opcode.JUMP_TO, [destination])):
                                         destinations.add(destination)
-                                    # contains nested options
+                                    # contains (unlifted) nested options
                                     case HigherLevelInstructionJumpOptions(_) | HigherLevelInstructionLowerLevelOpcode(_, Instruction(Opcode.JUMP, [])):
+                                        give_up = True
+                                    # contains unlifted if statement
+                                    case HigherLevelInstructionIfClause(_) | HigherLevelInstructionLowerLevelOpcode(_, Instruction(Opcode.JUMP_IF_FALSE, _)):
                                         give_up = True
                                     case _:
                                         errors.append(CannotLiftInstructionError(f"Expected JUMP_TO instruction at end of choice body '{options[j].destination}', found {choice_final_inst}", lifted_node, i))
@@ -698,6 +737,72 @@ class Decompiler:
                                 first_option_index = lifted_node.instructions.index(options[-1])
                                 lifted_node.mutate(first_option_index, first_option_index, [HigherLevelInstructionSpacer(HigherLevelOpcode.SPACER), options[-1]])
                                 break
+                    case HigherLevelInstructionIfClause(_, _, _, end):
+                        # we need to make sure this is actually the first IF_CLAUSE for this value of `end` (i.e. this if statement group)
+                        branch_count = 0
+                        for inst_ll in node.instructions:
+                            if inst_ll.opcode == Opcode.JUMP_TO and inst_ll.operands[0] == end:
+                                branch_count += 1
+
+                        clauses = [inst]
+                        give_up = False
+                        current_clause = inst
+
+                        end_body = lifted_node.block(end)
+
+                        if lifted_node.block_needs_lifting(end) and not (not lifted_node.need_lifting(end_body[:-1]) and end_body[-1].opcode == HigherLevelOpcode.LOWER_LEVEL_OPCODE and end_body[-1].inst_ll.opcode == Opcode.JUMP_TO):
+                            give_up = True
+
+                        while current_clause:
+                            else_body = lifted_node.block(current_clause.else_)
+                            if lifted_node.need_lifting(else_body[1:-1]):
+                                give_up = True
+                                break
+                            if current_clause.condition != '<dummy>':
+                                match else_body[0]:
+                                    case HigherLevelInstructionLowerLevelOpcode(_, Instruction(Opcode.POP, _)):
+                                        pass
+                                    case _:
+                                        errors.append(CannotLiftInstructionError(f"Expected POP instruction at start of else body '{current_clause.else_}', found {else_body[0]}", lifted_node, i))
+                                        give_up = True
+                                if len(else_body) == 1:
+                                    # if we have an else branch without a `JUMP_TO`, that's an extra branch we missed
+                                    branch_count += 1
+                                    if lifted_node.basic_blocks[current_clause.else_][0] + 1 != lifted_node.basic_blocks[current_clause.end][0]:
+                                        errors.append(CannotLiftInstructionError(f"Invalid empty else body '{current_clause.else_}'", lifted_node, i))
+                                        give_up = True
+                                        break
+                            match else_body[-1]:
+                                case HigherLevelInstructionIfClause(_, _, _, next_clause_end):
+                                    if next_clause_end == end:
+                                        clauses.append(else_body[-1])
+                                        current_clause = else_body[-1]
+                                    else:
+                                        # hacky way to avoid recursion
+                                        current_clause = HigherLevelInstructionIfClause(HigherLevelOpcode.IF_CLAUSE, '<dummy>', '<dummy>', '<dummy>', else_body[-1].end)
+                                # case HigherLevelInstructionLowerLevelOpcode(_, Instruction(Opcode.JUMP_TO, _)):
+                                case _:
+                                    current_clause = None
+                        if not give_up:
+                            # ensure all clauses are covered (+ an extra else)
+                            if len(clauses) + 1 == branch_count:
+                                lifted_node.mutate(i, i, [HigherLevelInstructionIf(HigherLevelOpcode.IF, clauses),] + lifted_node.block(end))
+                                for clause in clauses:
+                                    jump_to_instr = lifted_node.basic_blocks[clause.destination][1]
+                                    lifted_node.remove(jump_to_instr, jump_to_instr)
+                                    try:
+                                        clause_line = lifted_node.instructions.index(clause)
+                                        lifted_node.remove(clause_line, clause_line)
+                                    except ValueError:
+                                        pass
+                                else_body = lifted_node.block(clauses[-1].else_)
+                                if else_body[-1].opcode.value & HIGHERLEVEL_INCOMPLETE:
+                                    else_trailer = lifted_node.basic_blocks[clauses[-1].else_][1]
+                                    lifted_node.remove(else_trailer, else_trailer)
+                                if else_body[0].opcode.value & HIGHERLEVEL_INCOMPLETE:
+                                    else_header = lifted_node.basic_blocks[clauses[-1].else_][0]
+                                    lifted_node.remove(else_header, else_header)
+                                break # we mutated the length of the node
                 pass
             else:
                 if lifted_node.block_needs_lifting():
@@ -736,16 +841,33 @@ class Decompiler:
                 return f"<<set {variable} = {value}>>"
             case HigherLevelInstructionAddOptionAdvanced(_, line, destination, _, condition):
                 # return (f"-> {self.localize(line)}{' <<' + condition + '>>' if condition else ''}\n" + self.repr_block(node, destination, 1)).rstrip()
-                # TODO: DEBUGGING PURPOSES ONLY
+                # TODO: DEBUGGING PURPOSES ONLY (use of `disassemble_block`)
                 return (f"-> {self.localize(line)}{' <<' + condition + '>>' if condition else ''}\n" + self.disassemble_block(node, destination, 1)).rstrip()
+            case HigherLevelInstructionIf(_, clauses):
+                clauses_repr = []
+                for i, clause in enumerate(clauses):
+                    # TODO: DEBUGGING PURPOSES ONLY (use of `disassemble_block`)
+                    clauses_repr.append((f'<<{'if' if i == 0 else 'elseif'} {clause.condition}>>\n' + self.disassemble_block(node, clause.destination, 1)).rstrip())
+                if len(node.block(clauses[-1].else_)) > 0:
+                    try:
+                        self.repr_block(node, clauses[-1].else_, 1)
+                    except BaseException:
+                        print(self.disassemble_block(node, clauses[-1].else_, 1))
+                    finally:
+                        clauses_repr.append(('<<else>>\n' + self.disassemble_block(node, clauses[-1].else_, 1)).rstrip())
+                clauses_repr.append('<<endif>>')
+                return '\n'.join(clauses_repr)
+            case HigherLevelInstructionRunLineAdvanced(_, line, substitutions):
+                translated_line = self.localize(line)
+                for i, substitution in enumerate(substitutions):
+                    translated_line = translated_line.replace(f"{{{i}}}", f"{{{substitution}}}")
+                return translated_line
+            case HigherLevelInstructionRunCommandAdvanced(_, command, substitutions):
+                for i, substitution in enumerate(substitutions):
+                    command = command.replace(f"{{{i}}}", f"{{{substitution}}}")
+                return f"<<{command}>>"
             case HigherLevelInstructionLowerLevelOpcode(_, inst_ll):
                 match inst_ll:
-                    # ? I don't know why there are floats here
-                    case Instruction(Opcode.RUN_LINE, [line, float()]):
-                        return self.localize(line)
-                    case Instruction(Opcode.RUN_COMMAND, [command, float()]):
-                        return f"<<{command}>>"
-
                     case Instruction(Opcode.STOP):
                         return "<<stop>>"
 
