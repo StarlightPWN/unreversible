@@ -268,7 +268,7 @@ class LiftedNode:
         return False
 
 def indent(text: str, level: int):
-    return '\n'.join(map(lambda line: ' ' * (4 * level) + line if line else '', text.split('\n')))
+    return '\n'.join(map(lambda line: ' ' * (4 * level) + line, text.split('\n')))
 
 class Decompiler:
     def __init__(self, project):
