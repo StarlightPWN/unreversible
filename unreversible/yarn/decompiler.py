@@ -1,6 +1,7 @@
 from .vm import Instruction, Opcode
 
 import yaml
+import json
 import functools
 
 from enum import Enum
@@ -307,6 +308,7 @@ class Decompiler:
         try:
             lifted_node = self.lift_node(node)
         except NotYetLiftedError as e:
+            print('failed to lift node:', node.name)
             lifted_node = e.node
             errors = e.errors
 
@@ -876,7 +878,7 @@ class Decompiler:
                         return "<<stop>>"
 
                     case Instruction(Opcode.PUSH_STRING, [value]):
-                        return repr(value)
+                        return json.dumps(value)
                     case Instruction(Opcode.PUSH_BOOL, [value]):
                         return repr(value).lower()
                     case Instruction(Opcode.PUSH_FLOAT, [value]):
