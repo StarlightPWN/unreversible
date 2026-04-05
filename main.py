@@ -12,7 +12,7 @@ import binascii
 def decompile_for_editing(decompiler: Decompiler) -> str:
     decompiled_nodes = []
 
-    for node in (item[1] for item in sorted(decompiler.project.nodes.items())):
+    for node in decompiler.project.nodes.values():
         try:
             source = decompiler.decompile_node(node, False) or "<<stop>>"
             decompiled_nodes.append(yaml.safe_dump({"title": node.name, "originalCrc32": binascii.crc32(source.encode()).to_bytes(4).hex()}).strip() + "\n---\n" + source)
