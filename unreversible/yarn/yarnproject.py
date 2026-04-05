@@ -2,7 +2,7 @@ from .yarn_spinner_pb2 import (
     Program,
     Node as SerializedNode,
 )
-from .vm import Instruction
+from .vm import Instruction, Opcode
 from typing import Any
 from dataclasses import dataclass
 import yaml
@@ -49,30 +49,61 @@ class Localization:
 
 
 class YarnProject:
-    def __init__(self, data):
-        self._raw_program = Program()
-        self._raw_program.ParseFromString(bytes.fromhex(data["compiledYarnProgram"]))
-        self.name = self._raw_program.name
+    def __init__(self, data_or_nodes, localization = None):
         self.nodes = {}
+        self.base_localization = None
 
-        # TODO: document that this relies on Unity asset logic, or refactor such that it doesn't (so we can keep Protobuf here)
-        self.base_localization = Localization(
-            data["baseLocalization"].data["_LocaleCode"],
-            dict(
-                zip(
-                    data["baseLocalization"].data["_stringTable"]["keys"],
-                    data["baseLocalization"].data["_stringTable"]["values"],
-                )
-            ),
-            dict(
-                zip(
-                    data["baseLocalization"].data["_assetTable"]["keys"],
-                    data["baseLocalization"].data["_assetTable"]["values"],
-                )
-            ),
-        )
+        if isinstance(data_or_nodes, dict):
+            if "compiledYarnProgram" in data_or_nodes:
+                self._raw_program = Program()
+                self._raw_program.ParseFromString(bytes.fromhex(data_or_nodes["compiledYarnProgram"]))
+                self.name = self._raw_program.name
 
-        for node_name in self._raw_program.nodes:
-            self.nodes[node_name] = YarnNode.from_serialized(
-                self._raw_program.nodes[node_name], self
-            )
+                for node_name in self._raw_program.nodes:
+                    self.nodes[node_name] = YarnNode.from_serialized(
+                        self._raw_program.nodes[node_name], self
+                    )
+                if "baseLocalization" in data_or_nodes and localization is None:
+                    self.base_localization = Localization(
+                        data_or_nodes["baseLocalization"].data["_LocaleCode"],
+                        dict(
+                            zip(
+                                data_or_nodes["baseLocalization"].data["_stringTable"]["keys"],
+                                data_or_nodes["baseLocalization"].data["_stringTable"]["values"],
+                            )
+                        ),
+                        dict(
+                            zip(
+                                data_or_nodes["baseLocalization"].data["_assetTable"]["keys"],
+                                data_or_nodes["baseLocalization"].data["_assetTable"]["values"],
+                            )
+                        ),
+                    )
+            else:
+                if "nodes" in data_or_nodes:
+                    data_or_nodes = data_or_nodes["nodes"]
+
+                for _, node in data_or_nodes.items():
+                    instructions = []
+                    for instruction in node["instructions"]:
+                        if 'opcode' not in instruction:
+                            instruction['opcode'] = 'JUMP_TO'
+                        instructions.append(Instruction(Opcode.__members__[instruction['opcode']], list(
+                            map(
+                                lambda operand: operand['stringValue']
+                                if "stringValue" in operand
+                                else operand['boolValue']
+                                if "boolValue" in operand
+                                else float(operand['floatValue']),
+                                instruction['operands'] if 'operands' in instruction else (),
+                            )
+                        )))
+
+                    self.nodes[node['name']] = YarnNode(
+                        node['name'],
+                        instructions,
+                        node['labels'],
+                        [],
+                        self,
+                    )
+            self.base_localization = localization if localization else (self.base_localization or Localization("und", {}, {}))
