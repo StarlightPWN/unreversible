@@ -22,13 +22,14 @@ def decompile_for_editing(decompiler: Decompiler) -> str:
 
     return "\n===\n".join(decompiled_nodes) + "\n==="
 
-os.chdir(os.path.dirname(__file__))
-
 base = sys.argv[1] if len(sys.argv) >= 2 else r"C:\Program Files (x86)\Steam\steamapps\common\UNBEATABLE\dumped"
 
 with open(os.path.join(base, "lines.json"), "r") as f:
     lines = json.load(f)
 localization = Localization("und", lines, {})
+
+os.chdir(os.path.dirname(__file__))
+os.makedirs('./decompiled/yarn')
 
 for path in os.listdir(base):
     if path.endswith(".yarnproject.json") and not path.startswith('.'):
