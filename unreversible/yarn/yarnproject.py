@@ -1,7 +1,15 @@
-from .yarn_spinner_pb2 import (
-    Program,
-    Node as SerializedNode,
-)
+try:
+    from .yarn_spinner_pb2_jsadfkldjsfldsjkl import (
+        Program,
+        Node as SerializedNode,
+    )
+except ImportError:
+    class Program:
+        def __init__(self):
+            raise NotImplementedError("missing generated code for Protocol Buffers support")
+    class SerializedNode:
+        pass
+
 from .vm import Instruction, Opcode
 from typing import Any
 from dataclasses import dataclass

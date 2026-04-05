@@ -1,6 +1,10 @@
-from .yarn_spinner_pb2 import (
-    Instruction as SerializedInstruction,
-)
+try:
+    from .yarn_spinner_pb2 import (
+        Instruction as SerializedInstruction,
+    )
+except ImportError:
+    class SerializedInstruction:
+        pass
 
 from enum import Enum
 from dataclasses import dataclass
