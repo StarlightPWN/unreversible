@@ -3,9 +3,9 @@ import sys
 import csv
 import json
 import yaml
-import shlex
 import tempfile
 import binascii
+import subprocess
 
 from unreversible.yarn.vm import Instruction, Opcode
 from unreversible.yarn.yarn_spinner_pb2 import Program
@@ -81,11 +81,12 @@ with tempfile.TemporaryDirectory() as tmpdir:
 
         with open(tmp_source_file, "w") as f:
             f.write(source_to_compile)
-        os.system(shlex.join(('ysc', 'tag', tmp_source_file)))
+        subprocess.run(['ysc', 'tag', tmp_source_file])
+        subprocess.run(('ysc', 'tag', tmp_source_file))
         with open(tmp_source_file, "r") as f:
             tagged_source = f.read()
         tagged_source_lines = tagged_source.split('\n')
-        os.system(shlex.join(('ysc', 'compile', '-t', 'lines.csv', '-o', tmpdir, tmp_source_file)))
+        subprocess.run(('ysc', 'compile', '-t', 'lines.csv', '-o', tmpdir, tmp_source_file))
 
         with open(lines_file, 'r') as f:
             reader = csv.reader(f)
@@ -109,7 +110,7 @@ with tempfile.TemporaryDirectory() as tmpdir:
         with open(tmp_source_file, "w") as f:
             f.write('\n'.join(tagged_source_lines))
 
-        os.system(shlex.join(('ysc', 'compile', '-n', 'compiledStream.yarnc', '-o', tmpdir, tmp_source_file)))
+        subprocess.run(('ysc', 'compile', '-n', 'compiledStream.yarnc', '-o', tmpdir, tmp_source_file))
 
         with open(os.path.join(tmpdir, 'compiledStream.yarnc'), "rb") as f:
             program = Program()
