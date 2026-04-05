@@ -1,5 +1,5 @@
 try:
-    from .yarn_spinner_pb2_jsadfkldjsfldsjkl import (
+    from .yarn_spinner_pb2 import (
         Program,
         Node as SerializedNode,
     )
