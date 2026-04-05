@@ -5,6 +5,7 @@ from unreversible.yarn import YarnProject, Decompiler
 from unreversible.yarn.yarnproject import Localization
 import json
 
+import sys
 import yaml
 import binascii
 
@@ -23,7 +24,7 @@ def decompile_for_editing(decompiler: Decompiler) -> str:
 
 os.chdir(os.path.dirname(__file__))
 
-base = "/Volumes/exFAT Drive/Sikarugir/Steam.app/Contents/drive_c/Program Files (x86)/Steam/steamapps/common/UNBEATABLE/dumped"
+base = sys.argv[1] if len(sys.argv) >= 2 else r"C:\Program Files (x86)\Steam\steamapps\common\UNBEATABLE\dumped"
 
 with open(os.path.join(base, "lines.json"), "r") as f:
     lines = json.load(f)
