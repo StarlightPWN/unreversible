@@ -29,7 +29,7 @@ with open(os.path.join(base, "lines.json"), "r") as f:
 localization = Localization("und", lines, {})
 
 os.chdir(os.path.dirname(__file__))
-os.makedirs('./decompiled/yarn')
+os.makedirs('./decompiled/yarn', exist_ok=True)
 
 for path in os.listdir(base):
     if path.endswith(".yarnproject.json") and not path.startswith('.'):
