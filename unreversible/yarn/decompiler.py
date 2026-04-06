@@ -337,7 +337,8 @@ class Decompiler:
                 for x in instruction.__dict__
                 if x != "opcode"
             }
-            return f"<<$-{instruction.opcode.name}({', '.join(map(lambda pair: f'{pair[0] + "=" if len(fields) > 1 else ""}{pair[1]!r}', fields.items()))})>>"
+            operands = ', '.join(map(lambda pair: (pair[0] + "=" if len(fields) > 1 else "") + repr(pair[1]), fields.items()))
+            return f"<<$-{instruction.opcode.name}({operands})>>"
 
     # for debugging purposes only
     def disassemble_lifted_node(self, node: LiftedNode):
@@ -852,8 +853,9 @@ class Decompiler:
             case HigherLevelInstructionIf(_, clauses):
                 clauses_repr = []
                 for i, clause in enumerate(clauses):
+                    command = 'if' if i == 0 else 'elseif'
                     # TODO: DEBUGGING PURPOSES ONLY (use of `disassemble_block`)
-                    clauses_repr.append((f'<<{'if' if i == 0 else 'elseif'} {clause.condition}>>\n' + self.disassemble_block(node, clause.destination, 1)).rstrip())
+                    clauses_repr.append((f'<<{command} {clause.condition}>>\n' + self.disassemble_block(node, clause.destination, 1)).rstrip())
                 if len(node.block(clauses[-1].else_)) > 0:
                     try:
                         self.repr_block(node, clauses[-1].else_, 1)
