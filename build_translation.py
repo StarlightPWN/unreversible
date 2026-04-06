@@ -59,11 +59,11 @@ with open(os.path.join(base, 'lines.json'), 'r') as f:
 added_lines = {}
 
 os.makedirs('./Translation', exist_ok=True)
-with tempfile.TemporaryDirectory() as tmpdir:
-    for yarn_filename in os.listdir("./decompiled/yarn"):
-        if not yarn_filename.endswith('.yarn'):
-            continue
-
+for yarn_filename in os.listdir("./decompiled/yarn"):
+    if not yarn_filename.endswith('.yarn'):
+        continue
+    # we use a different temporary directory for each program because `ysc` will corrupt compiled files if they already exist
+    with tempfile.TemporaryDirectory() as tmpdir:
         source_to_compile = ''
 
         for node_source in find_modified(os.path.join("./decompiled/yarn", yarn_filename)):
