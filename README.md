@@ -19,9 +19,6 @@ Run `python3 main.py [dumped]` where `[dumped]` is replaced with the full path t
 A folder called `decompiled/yarn` will be created within the folder you cloned this repository containing decompiled Yarn Spinner project scripts recovered from the game's story mode.
 
 ## Editing
-> [!CAUTION]
-> Editing support is extremely buggy at the moment and recompilation will randomly break due to an issue I haven't figured out with the Protocol Buffers format of compiled Yarn projects. Proceed with caution and expect frequent failure.
-
 To modify decompiled scripts and put them back into the game, this tool once again relies on ErikGXDev's mod.
 
 You'll need the official Yarn Spinner compiler [`ysc`](https://github.com/YarnSpinnerTool/YarnSpinner-Console/tree/v2.0.2). Download the [GitHub release](https://github.com/YarnSpinnerTool/YarnSpinner-Console/releases/tag/v2.0.2) pointing to the version of Yarn Spinner the game uses (2.0.2), and put the executable somewhere on your `PATH` so the tool can find it.
