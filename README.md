@@ -18,6 +18,24 @@ Run `python3 main.py [dumped]` where `[dumped]` is replaced with the full path t
 
 A folder called `decompiled/yarn` will be created within the folder you cloned this repository containing decompiled Yarn Spinner project scripts recovered from the game's story mode.
 
+## Editing
+> [!CAUTION]
+> Editing support is extremely buggy at the moment and recompilation will randomly break due to an issue I haven't figured out with the Protocol Buffers format of compiled Yarn projects. Proceed with caution and expect frequent failure.
+
+To modify decompiled scripts and put them back into the game, this tool once again relies on ErikGXDev's mod.
+
+You'll need the official Yarn Spinner compiler [`ysc`](https://github.com/YarnSpinnerTool/YarnSpinner-Console/tree/v2.0.2). Download the [GitHub release](https://github.com/YarnSpinnerTool/YarnSpinner-Console/releases/tag/v2.0.2) pointing to the version of Yarn Spinner the game uses (2.0.2), and put the executable somewhere on your `PATH` so the tool can find it.
+
+So that the tool can read compiled projects to convert them into JSON, you'll need the Protocol Buffers generated code for a Yarn project. Download and install version 5.29.3 of Protocol Buffers `protoc` according to its [installation instructions](https://protobuf.dev/installation/).
+
+Download the Protocol Buffers [specification](https://github.com/YarnSpinnerTool/YarnSpinner/blob/v2.0.2/YarnSpinner/yarn_spinner.proto) for that version and use `protoc` to generate the Python source to read compiled projects:
+
+```sh
+$ protoc ./yarn_spinner.proto --python_out=./unreversible/yarn
+```
+
+Now edit the scripts in `decompiled/yarn` to your heart's content, and run `python3 build_translation.py [dumped]` where `[dumped]` is still the path to the mod export folder. This should create a `Translation` folder in the repository you can copy and paste into your UNBEATABLE installation for the mod to inject into the game's scripts. Happy modding!
+
 ## Credits
 Thank you to ErikGXDev for creating the mod used to extract story data from the game, the BepInEx project for enabling its usage, and the UNBEATABLE Modding Community Discord server for support during the development of this project.
 
