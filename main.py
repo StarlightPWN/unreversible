@@ -24,7 +24,7 @@ def decompile_for_editing(decompiler: Decompiler) -> str:
 
 base = sys.argv[1] if len(sys.argv) >= 2 else r"C:\Program Files (x86)\Steam\steamapps\common\UNBEATABLE\dumped"
 
-with open(os.path.join(base, "lines.json"), "r") as f:
+with open(os.path.join(base, "lines.json"), "r", encoding="utf-8") as f:
     lines = json.load(f)
 localization = Localization("und", lines, {})
 
@@ -33,11 +33,11 @@ os.makedirs('./decompiled/yarn', exist_ok=True)
 
 for path in os.listdir(base):
     if path.endswith(".yarnproject.json") and not path.startswith('.'):
-        with open(os.path.join(base, path), "r") as f:
+        with open(os.path.join(base, path), "r", encoding="utf-8") as f:
             project = YarnProject(json.load(f), localization)
             project.name = os.path.basename(path)[:-len(".yarnproject.json")]
         decompiler = Decompiler(project)
 
-        with open(os.path.join('./decompiled/yarn/', project.name + '.yarn'), "w") as f:
+        with open(os.path.join('./decompiled/yarn/', project.name + '.yarn'), "w", encoding="utf-8") as f:
             f.write(decompile_for_editing(decompiler))
             print('Decompiled', project.name, '(for editing)')
