@@ -10,7 +10,9 @@ import subprocess
 from unreversible.yarn.vm import Instruction, Opcode
 from unreversible.yarn.yarn_spinner_pb2 import Program
 
-base = sys.argv[1] if len(sys.argv) >= 2 else r"C:\Program Files (x86)\Steam\steamapps\common\UNBEATABLE\dumped"
+from util import get_game_path, get_working_directory
+
+base = sys.argv[1] if len(sys.argv) >= 2 else os.path.join(get_game_path(), "dumped")
 
 def read_varint(fp):
     value = 0
@@ -51,7 +53,7 @@ def find_modified(path):
         if binascii.crc32(source.encode()).to_bytes(4).hex() != original_checksum:
             yield yaml.safe_dump(metadata).strip() + '\n---\n' + source
 
-os.chdir(os.path.dirname(__file__))
+os.chdir(get_working_directory())
 with open(os.path.join(base, 'lines.json'), 'r') as f:
     original_lines = json.load(f)
     original_lines_backwards = dict(map(reversed, original_lines.items()))

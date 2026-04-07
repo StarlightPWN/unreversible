@@ -5,9 +5,10 @@ from unreversible.yarn import YarnProject, Decompiler
 from unreversible.yarn.yarnproject import Localization
 import json
 
-import sys
 import yaml
 import binascii
+
+from util import get_mod_export_folder, get_working_directory
 
 def decompile_for_editing(decompiler: Decompiler) -> str:
     decompiled_nodes = []
@@ -22,14 +23,16 @@ def decompile_for_editing(decompiler: Decompiler) -> str:
 
     return "\n===\n".join(decompiled_nodes) + "\n==="
 
-base = sys.argv[1] if len(sys.argv) >= 2 else r"C:\Program Files (x86)\Steam\steamapps\common\UNBEATABLE\dumped"
+base = get_mod_export_folder()
 
 with open(os.path.join(base, "lines.json"), "r", encoding="utf-8") as f:
     lines = json.load(f)
 localization = Localization("und", lines, {})
 
-os.chdir(os.path.dirname(__file__))
+os.chdir(get_working_directory())
 os.makedirs('./decompiled/yarn', exist_ok=True)
+
+print("Decompiling to", os.path.join(os.path.abspath(os.curdir), 'decompiled/yarn'))
 
 for path in os.listdir(base):
     if path.endswith(".yarnproject.json") and not path.startswith('.'):
