@@ -1,3 +1,4 @@
+# nuitka-project: --onefile
 import os
 import os.path
 
@@ -9,6 +10,7 @@ import yaml
 import binascii
 
 from util import get_mod_export_folder, get_working_directory
+from build_translation import build_translation
 
 def decompile_for_editing(decompiler: Decompiler) -> str:
     decompiled_nodes = []
@@ -41,6 +43,12 @@ for path in os.listdir(base):
             project.name = os.path.basename(path)[:-len(".yarnproject.json")]
         decompiler = Decompiler(project)
 
-        with open(os.path.join('./decompiled/yarn/', project.name + '.yarn'), "w", encoding="utf-8") as f:
-            f.write(decompile_for_editing(decompiler))
-            print('Decompiled', project.name, '(for editing)')
+        decompiled_path = os.path.join('./decompiled/yarn/', project.name + '.yarn')
+        if os.path.exists(decompiled_path):
+            print('Skipping', project.name, '(existing file found)')
+        else:
+            with open(os.path.join(decompiled_path), "w", encoding="utf-8") as f:
+                f.write(decompile_for_editing(decompiler))
+                print('Decompiled', project.name, '(for editing)')
+
+build_translation(base)

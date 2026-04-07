@@ -10,7 +10,7 @@ import subprocess
 from unreversible.yarn.vm import Instruction, Opcode
 from unreversible.yarn.yarn_spinner_pb2 import Program
 
-from util import get_game_path, get_working_directory
+from util import get_game_path, get_mod_export_folder, get_working_directory
 
 base = sys.argv[1] if len(sys.argv) >= 2 else os.path.join(get_game_path(), "dumped")
 
@@ -53,93 +53,98 @@ def find_modified(path):
         if binascii.crc32(source.encode()).to_bytes(4).hex() != original_checksum:
             yield yaml.safe_dump(metadata).strip() + '\n---\n' + source
 
-os.chdir(get_working_directory())
-with open(os.path.join(base, 'lines.json'), 'r') as f:
-    original_lines = json.load(f)
-    original_lines_backwards = dict(map(reversed, original_lines.items()))
+def build_translation(base):
+    print('Building translation from', os.path.join(os.path.abspath(os.curdir), 'decompiled/yarn'), 'for install', base, 'in', os.path.join(os.path.abspath(os.curdir), 'Translation'))
+    with open(os.path.join(base, 'lines.json'), 'r') as f:
+        original_lines = json.load(f)
+        original_lines_backwards = dict(map(reversed, original_lines.items()))
 
-added_lines = {}
+    added_lines = {}
 
-os.makedirs('./Translation', exist_ok=True)
-for yarn_filename in os.listdir("./decompiled/yarn"):
-    if not yarn_filename.endswith('.yarn'):
-        continue
-    # we use a different temporary directory for each program because `ysc` will corrupt compiled files if they already exist
-    with tempfile.TemporaryDirectory() as tmpdir:
-        source_to_compile = ''
-
-        for node_source in find_modified(os.path.join("./decompiled/yarn", yarn_filename)):
-            source_to_compile += node_source.strip() + '\n===\n'
-        if not source_to_compile:
+    os.makedirs('./Translation', exist_ok=True)
+    for yarn_filename in os.listdir("./decompiled/yarn"):
+        if not yarn_filename.endswith('.yarn'):
             continue
+        # we use a different temporary directory for each program because `ysc` will corrupt compiled files if they already exist
+        with tempfile.TemporaryDirectory() as tmpdir:
+            source_to_compile = ''
 
-        project_json_name = yarn_filename[:-len('.yarn')] + '.yarnproject.json'
+            for node_source in find_modified(os.path.join("./decompiled/yarn", yarn_filename)):
+                source_to_compile += node_source.strip() + '\n===\n'
+            if not source_to_compile:
+                continue
 
-        with open(os.path.join(base, project_json_name), 'r') as f:
-            project_json = json.load(f)
+            project_json_name = yarn_filename[:-len('.yarn')] + '.yarnproject.json'
 
-        tmp_source_file = os.path.join(tmpdir, 'source.yarn')
-        lines_file = os.path.join(tmpdir, 'lines.csv')
+            with open(os.path.join(base, project_json_name), 'r') as f:
+                project_json = json.load(f)
 
-        with open(tmp_source_file, "w") as f:
-            f.write(source_to_compile)
-        subprocess.run(['ysc', 'tag', tmp_source_file])
-        subprocess.run(('ysc', 'tag', tmp_source_file))
-        with open(tmp_source_file, "r") as f:
-            tagged_source = f.read()
-        tagged_source_lines = tagged_source.split('\n')
-        subprocess.run(('ysc', 'compile', '-t', 'lines.csv', '-o', tmpdir, tmp_source_file))
+            tmp_source_file = os.path.join(tmpdir, 'source.yarn')
+            lines_file = os.path.join(tmpdir, 'lines.csv')
 
-        with open(lines_file, 'r') as f:
-            reader = csv.reader(f)
-            next(reader) # skip header line
-            for line_id, text, _, _, line_number in reader:
-                line_index = int(line_number) - 1
-                replacement_line = tagged_source_lines[line_index].rstrip()
-                original_tag = ' #' + line_id
-                assert replacement_line.endswith(original_tag)
-                replacement_line = replacement_line[:-len(original_tag)]
+            with open(tmp_source_file, "w") as f:
+                f.write(source_to_compile)
+            subprocess.run(['ysc', 'tag', tmp_source_file])
+            subprocess.run(('ysc', 'tag', tmp_source_file))
+            with open(tmp_source_file, "r") as f:
+                tagged_source = f.read()
+            tagged_source_lines = tagged_source.split('\n')
+            subprocess.run(('ysc', 'compile', '-t', 'lines.csv', '-o', tmpdir, tmp_source_file))
 
-                if replacement_line in original_lines_backwards:
-                    replacement_line += ' #' + original_lines_backwards[replacement_line]
-                else:
-                    new_line_id = 'line:unreversible-' + yarn_filename.replace(' ', '-') + '-L' + line_number
-                    added_lines[new_line_id] = text
-                    replacement_line += ' #' + new_line_id
+            with open(lines_file, 'r') as f:
+                reader = csv.reader(f)
+                next(reader) # skip header line
+                for line_id, text, _, _, line_number in reader:
+                    line_index = int(line_number) - 1
+                    replacement_line = tagged_source_lines[line_index].rstrip()
+                    original_tag = ' #' + line_id
+                    assert replacement_line.endswith(original_tag)
+                    replacement_line = replacement_line[:-len(original_tag)]
 
-                tagged_source_lines[line_index] = replacement_line
+                    if replacement_line in original_lines_backwards:
+                        replacement_line += ' #' + original_lines_backwards[replacement_line]
+                    else:
+                        new_line_id = 'line:unreversible-' + yarn_filename.replace(' ', '-') + '-L' + line_number
+                        added_lines[new_line_id] = text
+                        replacement_line += ' #' + new_line_id
 
-        with open(tmp_source_file, "w") as f:
-            f.write('\n'.join(tagged_source_lines))
+                    tagged_source_lines[line_index] = replacement_line
 
-        subprocess.run(('ysc', 'compile', '-n', 'compiledStream.yarnc', '-o', tmpdir, tmp_source_file))
+            with open(tmp_source_file, "w") as f:
+                f.write('\n'.join(tagged_source_lines))
 
-        with open(os.path.join(tmpdir, 'compiledStream.yarnc'), "rb") as f:
-            program = Program()
-            program.MergeFromString(f.read())
+            subprocess.run(('ysc', 'compile', '-n', 'compiledStream.yarnc', '-o', tmpdir, tmp_source_file))
 
-            for variable in program.initial_values:
-                if variable not in project_json['initialValues']:
-                    variant = program.initial_values[variable]
-                    project_json['initialValues'][variable] = { 'boolValue': variant.bool_value } if variant.HasField("bool_value") else { 'floatValue': variant.float_value } if variant.HasField("float_value") else { 'stringValue': variant.string_value }
-            for node_title in program.nodes:
-                if node_title in project_json['nodes']:
-                    raw_node = program.nodes[node_title]
-                    node_json = project_json['nodes'][node_title]
-                    node_json['instructions'] = []
-                    for serialized_instruction in raw_node.instructions:
-                        match (inst := Instruction.from_serialized(serialized_instruction)).opcode:
-                            case Opcode.JUMP_TO:
-                                node_json['instructions'].append({ 'operands': [ { 'stringValue': inst.operands[0] } ] })
-                            case _:
-                                node_json['instructions'].append({'opcode': inst.opcode.name} | ({'operands': list(map(encode_variant_json, inst.operands))} if inst.operands else {}))
-                    node_json['labels'] = dict(raw_node.labels)
-                    project_json['nodes'][node_title] = node_json
+            with open(os.path.join(tmpdir, 'compiledStream.yarnc'), "rb") as f:
+                program = Program()
+                program.MergeFromString(f.read())
 
-        with open(os.path.join('./Translation/', project_json_name), "w") as f:
-            json.dump(project_json, f)
+                for variable in program.initial_values:
+                    if variable not in project_json['initialValues']:
+                        variant = program.initial_values[variable]
+                        project_json['initialValues'][variable] = { 'boolValue': variant.bool_value } if variant.HasField("bool_value") else { 'floatValue': variant.float_value } if variant.HasField("float_value") else { 'stringValue': variant.string_value }
+                for node_title in program.nodes:
+                    if node_title in project_json['nodes']:
+                        raw_node = program.nodes[node_title]
+                        node_json = project_json['nodes'][node_title]
+                        node_json['instructions'] = []
+                        for serialized_instruction in raw_node.instructions:
+                            match (inst := Instruction.from_serialized(serialized_instruction)).opcode:
+                                case Opcode.JUMP_TO:
+                                    node_json['instructions'].append({ 'operands': [ { 'stringValue': inst.operands[0] } ] })
+                                case _:
+                                    node_json['instructions'].append({'opcode': inst.opcode.name} | ({'operands': list(map(encode_variant_json, inst.operands))} if inst.operands else {}))
+                        node_json['labels'] = dict(raw_node.labels)
+                        project_json['nodes'][node_title] = node_json
 
-lines = original_lines | added_lines
+            with open(os.path.join('./Translation/', project_json_name), "w") as f:
+                json.dump(project_json, f)
 
-with open('./Translation/lines.json', "w") as f:
-    json.dump(lines, f)
+    lines = original_lines | added_lines
+
+    with open('./Translation/lines.json', "w") as f:
+        json.dump(lines, f)
+
+if __name__ == '__main__':
+    os.chdir(get_working_directory())
+    build_translation(get_mod_export_folder())
