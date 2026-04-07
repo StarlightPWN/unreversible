@@ -65,6 +65,8 @@ def get_game_path():
                 game_path = config['game_path']
             except BaseException:
                 logger.error("Invalid config file '%s' will be overwritten", CONFIG_PATH, exc_info=True)
+    except FileNotFoundError:
+        pass
     except OSError:
         logger.error("Failed to read config file '%s'!", CONFIG_PATH, exc_info=True)
     if not game_path:
