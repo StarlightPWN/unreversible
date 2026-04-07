@@ -34,7 +34,7 @@ localization = Localization("und", lines, {})
 os.chdir(get_working_directory())
 os.makedirs('./decompiled/yarn', exist_ok=True)
 
-print("Decompiling to", os.path.join(os.path.abspath(os.curdir), 'decompiled/yarn'))
+print("Decompiling to", os.path.join(os.path.abspath(os.curdir), 'decompiled', 'yarn'))
 
 for path in os.listdir(base):
     if path.endswith(".yarnproject.json") and not path.startswith('.'):

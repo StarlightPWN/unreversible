@@ -54,7 +54,7 @@ def find_modified(path):
             yield yaml.safe_dump(metadata).strip() + '\n---\n' + source
 
 def build_translation(base):
-    print('Building translation from', os.path.join(os.path.abspath(os.curdir), 'decompiled/yarn'), 'from original data', base, 'in', os.path.join(os.path.abspath(os.curdir), 'Translation'))
+    print('Building translation from', os.path.join(os.path.abspath(os.curdir), 'decompiled', 'yarn'), 'from original data', base, 'in', os.path.join(os.path.abspath(os.curdir), 'Translation'))
     with open(os.path.join(base, 'lines.json'), 'r') as f:
         original_lines = json.load(f)
         original_lines_backwards = dict(map(reversed, original_lines.items()))
