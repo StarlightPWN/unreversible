@@ -87,7 +87,6 @@ def get_mod_export_folder():
         return os.path.join(GAME_PATH, "dumped")
 
 def get_working_directory():
-    is_compiled = hasattr(sys.modules["__main__"], "__nuitka_compiled__")
-    if is_compiled:
-        return os.path.dirname(os.path.abspath(sys.argv[0]))
+    if getattr(sys, 'frozen', False):
+        return os.path.dirname(sys._MEIPASS)
     return os.path.dirname(__file__)
